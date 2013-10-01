@@ -23,18 +23,11 @@ def main():
   config_settings = yaml.load(stream)
   configure_logging()
 
-  # logger = logging.getLogger('splunkcollector')
-  # logger.setLevel(logging.DEBUG)
-  # # create file handler which logs even debug messages
-  # fh = logging.FileHandler('splunkcollector.log')
-  # logger.addHandler(fh)
-
   def run_collector(collector):
     collector.run()
 
-    # Register the collector to run again in X seconds
-    logger.debug("Scheduling next collector run in %s seconds" % 10)
-    next_run_time = dt.now() + datetime.timedelta(seconds=10)
+    logger.debug("Scheduling next collector run in %s seconds" % collector.polling_interval)
+    next_run_time = dt.now() + datetime.timedelta(seconds=collector.polling_interval)
     scheduler.enterabs(time.mktime(next_run_time.timetuple()), 1, run_collector, (collector,))
 
   # Build a scheduler object that will look at absolute times

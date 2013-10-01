@@ -24,11 +24,17 @@ class CloudWatchCollector():
 		self.local_zone = tz.tzlocal()
 		self.utc_zone = tz.tzutc()
 
+		if 'cloudwatch_polling_interval' in config:
+			self.polling_interval = config['cloudwatch_polling_interval'] 
+		else:
+			self.polling_interval = 300
+
+
 	def run(self):
 		logger.debug("Running CloudwatchCollector")
 
 		end_time = dt.utcnow()
-		start_time = end_time - datetime.timedelta(seconds=300)
+		start_time = end_time - datetime.timedelta(seconds=self.polling_interval)
 		events = []
 
 		for metric in self.config['cloudwatch_metrics']:
