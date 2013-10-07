@@ -3,50 +3,45 @@ import boto.ec2.cloudwatch
 import datetime
 import logging
 from datetime import datetime as dt
-from dateutil import tz
 
 STATISTICS = ['Minimum', 'Maximum', 'Sum', 'Average', 'SampleCount']
 logger = logging.getLogger('cloud_log_poller')
 
 class CloudWatchCollector():
-	def __init__(self, config, transport):
-		self.config = config
-		self.transport = transport
+  def __init__(self, config, transports):
+    self.__config = config
+    self.__transports = transports
+    self.__last_run = None
 
-		aws_key_id = os.environ['AWS_ACCESS_KEY_ID']
-		aws_secret_key= os.environ['AWS_SECRET_ACCESS_KEY']
-
-		self.cloudwatch = boto.ec2.cloudwatch.connect_to_region(
-	    self.config['aws_region'], 
-	    aws_access_key_id=aws_key_id,
-	    aws_secret_access_key=aws_secret_key)
-
-		self.local_zone = tz.tzlocal()
-		self.utc_zone = tz.tzutc()
-
-		if 'cloudwatch_polling_interval' in config:
-			self.polling_interval = config['cloudwatch_polling_interval'] 
-		else:
-			self.polling_interval = 300
+    self.cloudwatch = boto.ec2.cloudwatch.connect_to_region(
+      config['aws_region'], 
+      aws_access_key_id=config['aws_access_key_id'],
+      aws_secret_access_key=config['aws_secret_access_key'])
 
 
-	def run(self):
-		logger.debug("Running CloudwatchCollector")
+  def run(self):
+    logger.info("Running CloudwatchCollector on %s metrics" % len(self.__config['metrics']))
 
-		end_time = dt.utcnow()
-		start_time = end_time - datetime.timedelta(seconds=self.polling_interval)
-		events = []
+    end_time = dt.utcnow()
+    if self.__last_run:
+      start_time = self.__last_run + datetime.timedelta(seconds=1)
+    else:
+      start_time = end_time - datetime.timedelta(seconds=60)
 
-		for metric in self.config['cloudwatch_metrics']:
-			namespace, metric_name = metric.split(':')
-			datapoints = self.cloudwatch.get_metric_statistics(60, start_time, end_time, metric_name, namespace, STATISTICS)
-			for datapoint in datapoints:
-				utc_time = datapoint['Timestamp'].replace(tzinfo=self.utc_zone)
-				local_time = utc_time.astimezone(self.local_zone)
+    # Set the start_time for the next run
+    self.__last_run = end_time
 
-				datapoint['Timestamp'] = local_time.strftime("%m/%d/%y %I:%M:%S.000 %p")
-				datapoint['MetricName'] = metric_name
-				events.append(datapoint)
-		
-			logger.debug("Found %s CloudWatch data points" % len(events))
-			self.transport.send(namespace, 'cloudwatch', events)
+    events = []
+
+    for metric in self.__config['metrics']:
+      namespace, metric_name = metric.split(':')
+      datapoints = self.cloudwatch.get_metric_statistics(60, start_time, end_time, metric_name, namespace, STATISTICS)
+     
+      for datapoint in datapoints:
+        logger.debug("Cloudwatch datapoint: " + repr(datapoint))
+        events.append(datapoint)
+
+    logger.info("Found %s Cloudwatch datapoints" % (len(events)))    
+    if (len(events) > 0):
+      for transport in self.__transports:   
+        transport.send(namespace, 'cloudwatch', events)
