@@ -18,7 +18,7 @@ class SqsCollector:
     config_defaults = {
       'num_messages_to_get': 10, 
       'queue_wait_time': 20, 
-      'flush_events_threshold': 50,
+      'max_events_threshold': 50,
       'json_messages': True
     }
 
@@ -47,8 +47,6 @@ class SqsCollector:
       return
 
     events = []
-    logger.debug("Polling sqs queue")
-
     while True:
       messages = self.queue.get_messages(
         num_messages=self.__config['num_messages_to_get'], 
@@ -68,9 +66,14 @@ class SqsCollector:
       if len(messages) > 0:
         for message in messages:
           # Delete the received messages from SQS
-          self.queue.delete_message_batch(messages)
+          self.queue.delete_message_batch(messages)      
       else:
         # Break out of the loop once we get no more messages back
+        break
+
+      # If we've collected the max configured number of events, break out now
+      # even if there are more messages remaining in the queue.
+      if len(events) >= self.__config['max_events_threshold']:
         break
       
     if len(events) > 0:
