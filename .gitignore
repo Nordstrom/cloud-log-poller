@@ -1,2 +1,4 @@
-config.yaml
+cloud_log_poller.yaml
 *.pyc
+*.log
+*.pid
