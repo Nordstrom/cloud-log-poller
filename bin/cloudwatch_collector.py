@@ -20,8 +20,6 @@ class CloudWatchCollector():
 
 
   def run(self):
-    logger.info("Running CloudwatchCollector on %s metrics" % len(self.__config['metrics']))
-
     end_time = dt.utcnow()
     if self.__last_run:
       start_time = self.__last_run + datetime.timedelta(seconds=1)
@@ -31,17 +29,25 @@ class CloudWatchCollector():
     # Set the start_time for the next run
     self.__last_run = end_time
 
+    logger.info("Running CloudwatchCollector on %s metrics between %s and %s" % 
+      (len(self.__config['metrics']), start_time, end_time))
+
     events = []
 
     for metric in self.__config['metrics']:
+      # TODO: Support for dimensions for dynamo table names
+      # http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/MonitoringDynamoDB.html
       namespace, metric_name = metric.split(':')
       datapoints = self.cloudwatch.get_metric_statistics(60, start_time, end_time, metric_name, namespace, STATISTICS)
-     
+      if len(datapoints) > 0:
+        logger.info("Received %s datapoints for Cloudwatch metric %s:%s" % (len(datapoints), namespace, metric_name))
       for datapoint in datapoints:
+        datapoint['metric'] = metric_name
         logger.debug("Cloudwatch datapoint: " + repr(datapoint))
         events.append(datapoint)
 
-    logger.info("Found %s Cloudwatch datapoints" % (len(events)))    
-    if (len(events) > 0):
-      for transport in self.__transports:   
-        transport.send(namespace, 'cloudwatch', events)
+      logger.info("Received %s datapoints for Cloudwatch metric %s:%s" % (len(datapoints), namespace, metric_name))
+      if (len(events) > 0):
+        for transport in self.__transports:   
+          transport.send(namespace, 'cloudwatch', events)
+
