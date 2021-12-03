@@ -1,5 +1,5 @@
-boto==2.9.9
-splunk-sdk==1.1.0
+boto==2.39.0
+splunk-sdk==1.6.16
 python-daemon==1.6
 inflection==0.2.0
 python-dateutil==2.1
